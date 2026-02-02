@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrefour Queue Simulation Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Running Simulation...</div>
+            <div class="loading-subtext">Processing queue dynamics and generating analytics</div>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-glass">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shopping-cart brand-icon"></i>
+                <span class="brand-text">Carrefour</span> Queue Simulator
+            </a>
+            <div class="navbar-controls">
+                <div class="theme-toggle-container">
+                    <label class="theme-label">Dark Mode</label>
+                    <label class="theme-toggle-switch">
+                        <input type="checkbox" id="theme-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" id="help-btn">
+                    <i class="fas fa-question-circle"></i> Help
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Configuration Panel -->
+            <div class="col-lg-4 col-xl-3">
+                <div class="card config-card shadow-sm">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Simulation Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Model Selection -->
+                        <div class="model-selection">
+                            <h6 class="section-title mb-3"><i class="fas fa-server me-2"></i>Queueing Model</h6>
+                            <div class="model-options">
+                                <div class="model-option active" data-model="M/M/1">
+                                    <div class="model-icon"><i class="fas fa-server"></i></div>
+                                    <span>M/M/1</span>
+                                    <small>Single Server</small>
+                                </div>
+                                <div class="model-option" data-model="M/M/2">
+                                    <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
+                                    <span>M/M/2</span>
+                                    <small>Two Servers</small>
+                                </div>
+                                <div class="model-option" data-model="M/M/3">
+                                    <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
+                                    <span>M/M/3</span>
+                                    <small>Three Servers</small>
+                                </div>
+                                <div class="model-option" data-model="M/M/4">
+                                    <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
+                                    <span>M/M/4</span>
+                                    <small>Four Servers</small>
+                                </div>
+                            </div>
+                            <div class="selected-model-display" id="selected-model-display">
+                                <div class="selected-model-header">
+                                    <i class="fas fa-check-circle me-2"></i>Selected Model:
+                                </div>
+                                <div class="badge bg-primary">M/M/1</div>
+                            </div>
+                        </div>
+
+                        <!-- Parameters -->
+                        <div class="config-section">
+                            <h6 class="section-title mb-3"><i class="fas fa-sliders-h me-2"></i>Simulation Parameters</h6>
+                            <div class="parameter-group">
+                                <label class="parameter-label" for="simulation-time">
+                                    <i class="fas fa-clock me-2"></i>Simulation Duration
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control form-control-lg" id="simulation-time" value="480" min="1">
+                                    <span class="input-group-text">minutes</span>
+                                </div>
+                                <small class="parameter-hint">Total time to simulate (e.g., 480 = 8 hours)</small>
+                            </div>
+                            <div class="parameter-group">
+                                <label class="parameter-label" for="mean-arrival">
+                                    <i class="fas fa-user-plus me-2"></i>Mean Arrival Time (λ)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control form-control-lg" id="mean-arrival" value="5" step="0.1" min="0.1">
+                                    <span class="input-group-text">minutes/customer</span>
+                                </div>
+                                <small class="parameter-hint">Average time between customer arrivals</small>
+                            </div>
+                            <div class="parameter-group">
+                                <label class="parameter-label" for="service-mean">
+                                    <i class="fas fa-hourglass-half me-2"></i>Mean Service Time (μ)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control form-control-lg" id="service-mean" value="6" step="0.1" min="0.1">
+                                    <span class="input-group-text">minutes/customer</span>
+                                </div>
+                                <small class="parameter-hint">Average time to serve one customer per server</small>
+                            </div>
+                        </div>
+
+                        <!-- Utilization Warning -->
+                        <div id="utilization-warning" class="alert alert-warning d-none" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="warning-text">High utilization may cause long queues</span>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button class="btn btn-primary btn-lg" id="calculate-btn">
+                                <i class="fas fa-play-circle me-2"></i>Run Simulation
+                            </button>
+                            <button class="btn btn-outline-secondary" id="reset-btn">
+                                <i class="fas fa-undo-alt me-2"></i>Reset Simulation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="col-lg-8 col-xl-9">
+                <!-- KPI Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-primary h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="stat-arrivals">0</div>
+                                <div class="stat-label">Total Customers</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-info h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="stat-utilization">0%</div>
+                                <div class="stat-label">System Utilization</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-success h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="stat-wait">0.0</div>
+                                <div class="stat-label">Avg Wait Time</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-warning h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="stat-turnaround">0.0</div>
+                                <div class="stat-label">Avg Turnaround</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-purple h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="kpi-lq">0.00</div>
+                                <div class="stat-label">Avg Queue Length (Lq)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-orange h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="kpi-wq">0.00</div>
+                                <div class="stat-label">Avg Wait Time (Wq)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-cyan h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="kpi-ws">0.00</div>
+                                <div class="stat-label">Time in System (W)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="stats-card card border-start border-pink h-100">
+                            <div class="card-body text-center p-3">
+                                <div class="stat-value" id="kpi-ls">0.00</div>
+                                <div class="stat-label">Customers in System (L)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Simulation Analytics</h5>
+                        <div class="chart-controls">
+                            <button class="btn btn-outline-primary btn-sm me-2" id="export-charts">
+                                <i class="fas fa-download me-1"></i> Export PNG
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" id="toggle-animation">
+                                <i class="fas fa-play me-1"></i> Animate Charts
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="chartTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="arrival-tab" data-bs-toggle="tab" data-bs-target="#arrival-chart" type="button" role="tab">
+                                    <i class="fas fa-user-clock me-1"></i> Arrival Pattern
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service-chart" type="button" role="tab">
+                                    <i class="fas fa-stopwatch me-1"></i> Service Times
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="turnaround-tab" data-bs-toggle="tab" data-bs-target="#turnaround-chart" type="button" role="tab">
+                                    <i class="fas fa-exchange-alt me-1"></i> Turnaround Times
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="queue-tab" data-bs-toggle="tab" data-bs-target="#queue-chart" type="button" role="tab">
+                                    <i class="fas fa-users me-1"></i> Queue Length
+                                </button>
+                            </li>
+                        </ul>
+                        <div class="tab-content mt-3">
+                            <div class="tab-pane fade show active" id="arrival-chart" role="tabpanel">
+                                <div class="chart-wrapper">
+                                    <div id="linechart" class="chart-container" style="height: 400px; width: 100%;"></div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Customer arrival pattern over simulation time</div>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="service-chart" role="tabpanel">
+                                <div class="chart-wrapper">
+                                    <div id="linechart-service" class="chart-container" style="height: 400px; width: 100%;"></div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Service time distribution per customer</div>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="turnaround-chart" role="tabpanel">
+                                <div class="chart-wrapper">
+                                    <div id="linechart-turnAround" class="chart-container" style="height: 400px; width: 100%;"></div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Turnaround time analysis (wait + service)</div>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="queue-chart" role="tabpanel">
+                                <div class="chart-wrapper">
+                                    <div id="queue-length-chart" class="chart-container" style="height: 400px; width: 100%;"></div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Queue length dynamics over time</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Server Statistics -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-server me-2"></i>Server Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="server-stats-container">
+                            <div class="col-12 text-center py-5">
+                                <i class="fas fa-server fa-3x text-muted mb-3"></i>
+                                <p class="text-muted fs-5">Run simulation to view server statistics</p>
+                                <p class="text-muted">Select a model and click "Run Simulation" to generate performance metrics</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Tables -->
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Simulation Results</h5>
+                        <ul class="nav nav-pills card-header-pills">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="simulation-tab" data-bs-toggle="tab" href="#simulation-table" role="tab">Simulation Data</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="cp-tab" data-bs-toggle="tab" href="#cp-table-section" role="tab">Cumulative Probability</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="simulation-table" role="tabpanel">
+                                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th scope="col">#</th>
+                                                <th scope="col">Inter-Arrival<br>(min)</th>
+                                                <th scope="col">Arrival Time<br>(min)</th>
+                                                <th scope="col">Service Time<br>(min)</th>
+                                                <th scope="col">Start Time<br>(min)</th>
+                                                <th scope="col">End Time<br>(min)</th>
+                                                <th scope="col">Turnaround<br>(min)</th>
+                                                <th scope="col">Wait Time<br>(min)</th>
+                                                <th scope="col">Response<br>(min)</th>
+                                                <th scope="col">Server</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="simulation_table">
+                                            <tr>
+                                                <td colspan="10" class="text-center py-5 text-muted">
+                                                    <i class="fas fa-play-circle fa-3x mb-3 opacity-50"></i>
+                                                    <p class="fs-5 fw-bold mb-1">Ready to Simulate</p>
+                                                    <p class="mb-0">Configure parameters and click "Run Simulation" to generate data</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="cp-table-section" role="tabpanel">
+                                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th scope="col">CP Lookup</th>
+                                                <th scope="col">Cumulative Probability</th>
+                                                <th scope="col">Time Between Arrivals</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="cp_table">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-5 text-muted">
+                                                    <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
+                                                    <p class="fs-5 fw-bold mb-1">Cumulative Probability Table</p>
+                                                    <p class="mb-0">Run simulation to generate probability distribution data</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-5">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-md-8 text-center text-md-start mb-3 mb-md-0">
+                    <p class="mb-0">&copy; 2026 Carrefour Queueing Simulation Dashboard v3.0</p>
+                    <p class="mb-0 text-muted small">Academic simulation tool for queueing theory analysis</p>
+                </div>
+                <div class="col-md-4 text-center text-md-end">
+                    <div class="footer-links d-flex flex-wrap justify-content-center justify-content-md-end gap-3">
+                        <a href="#" class="footer-link" id="help-link"><i class="fas fa-book me-1"></i> User Guide</a>
+                        <a href="#" class="footer-link export-data-link"><i class="fas fa-file-export me-1"></i> Export Data</a>
+                        <a href="#" class="footer-link"><i class="fas fa-calculator me-1"></i> Theoretical Calculator</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="helpModalLabel"><i class="fas fa-question-circle me-2 text-primary"></i>Simulation Guide</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6 class="mb-3"><i class="fas fa-bolt text-warning me-2"></i>Quick Start</h6>
+                        <ol>
+                            <li>Select a queueing model (M/M/1 to M/M/4)</li>
+                            <li>Set simulation duration (minutes)</li>
+                            <li>Enter mean arrival time (minutes/customer)</li>
+                            <li>Enter mean service time (minutes/customer)</li>
+                            <li>Click "Run Simulation" to generate results</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="mb-4 p-3 bg-light rounded">
+                        <h6 class="mb-2"><i class="fas fa-lightbulb text-success me-2"></i>Key Insight</h6>
+                        <p class="mb-0"><strong>Utilization (ρ) = λ/(cμ)</strong> must be &lt; 1 for stable system</p>
+                        <p class="mb-0 mt-1">Where λ = arrival rate, μ = service rate, c = number of servers</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6 class="mb-3"><i class="fas fa-chart-bar text-info me-2"></i>Understanding Metrics</h6>
+                        <ul>
+                            <li><strong>Lq:</strong> Average number of customers waiting in queue</li>
+                            <li><strong>Wq:</strong> Average waiting time before service begins</li>
+                            <li><strong>W:</strong> Total time in system (waiting + service)</li>
+                            <li><strong>L:</strong> Average number of customers in entire system</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>For accurate results, run simulations for at least 480 minutes (8 hours)
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="index.js"></script>
+</body>
+</html>
