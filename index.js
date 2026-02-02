@@ -1,22 +1,6 @@
-// ==================== INITIALIZATION ====================
-// Load Google Charts ONCE with a callback
-google.charts.load('current', {
-    packages: ['corechart'],
-    callback: function() {
-        console.log('Google Charts loaded successfully');
-        SimulationState.googleChartsLoaded = true;
-        
-        // If we have data waiting to be charted, draw now
-        if (SimulationState.pendingChartData) {
-            generateGraphs(SimulationState.pendingChartData);
-            SimulationState.pendingChartData = null;
-        }
-    }
-});
-
-// Global state
+// ==================== GLOBAL STATE ====================
 const SimulationState = {
-    currentModel: null,
+    currentModel: 'M/G/1',
     simulationData: null,
     charts: {},
     isAnimating: false,
@@ -25,307 +9,265 @@ const SimulationState = {
     pendingChartData: null
 };
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+// ==================== INITIALIZATION ====================
+google.charts.load('current', { 
+    packages: ['corechart'],
+    callback: () => {
+        SimulationState.googleChartsLoaded = true;
+        console.log('Google Charts loaded successfully');
+        if (SimulationState.pendingChartData) {
+            generateGraphs(SimulationState.pendingChartData);
+            SimulationState.pendingChartData = null;
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
     initializeEventListeners();
     initializeModelSelection();
     initializeInputValidation();
     setDefaultValues();
-    initTooltips();
+    
+    setTimeout(() => {
+        showToast('Welcome to M/G/c Queue Simulator! Configure Gamma parameters and run simulation.', 'info', 4500);
+    }, 800);
 });
 
 // ==================== THEME MANAGEMENT ====================
 function initializeTheme() {
     const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-        const currentTheme = SimulationState.isDarkMode ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', currentTheme);
-        themeToggle.checked = SimulationState.isDarkMode;
-        themeToggle.addEventListener('change', toggleTheme);
-    }
-}
-
-function toggleTheme() {
-    SimulationState.isDarkMode = !SimulationState.isDarkMode;
-    const newTheme = SimulationState.isDarkMode ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    showToast(`Switched to ${newTheme === 'dark' ? 'Dark' : 'Light'} Mode`, 'info', 2000);
-
-    if (SimulationState.simulationData) {
-        setTimeout(redrawAllCharts, 300);
-    }
-}
-
-// ==================== EVENT LISTENERS ====================
-function initializeEventListeners() {
-    document.querySelectorAll('.model-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const model = this.getAttribute('data-model');
-            selectModel(model);
-        });
+    if (!themeToggle) return;
+    
+    document.documentElement.setAttribute('data-theme', SimulationState.isDarkMode ? 'dark' : 'light');
+    themeToggle.checked = SimulationState.isDarkMode;
+    
+    themeToggle.addEventListener('change', () => {
+        SimulationState.isDarkMode = !SimulationState.isDarkMode;
+        document.documentElement.setAttribute('data-theme', SimulationState.isDarkMode ? 'dark' : 'light');
+        localStorage.setItem('theme', SimulationState.isDarkMode ? 'dark' : 'light');
+        
+        showToast(`Switched to ${SimulationState.isDarkMode ? 'Dark' : 'Light'} Mode`, 'info', 2500);
+        
+        if (SimulationState.simulationData && SimulationState.googleChartsLoaded) {
+            setTimeout(redrawAllCharts, 300);
+        }
     });
-
-    const calculateBtn = document.getElementById('calculate-btn');
-    if (calculateBtn) {
-        calculateBtn.addEventListener('click', runSimulation);
-    }
-
-    const resetBtn = document.getElementById('reset-btn');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', resetSimulation);
-    }
-
-    const helpBtn = document.getElementById('help-btn');
-    if (helpBtn) {
-        helpBtn.addEventListener('click', showHelp);
-    }
-
-    const exportBtn = document.getElementById('export-charts');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportCharts);
-    }
-
-    const toggleAnimBtn = document.getElementById('toggle-animation');
-    if (toggleAnimBtn) {
-        toggleAnimBtn.addEventListener('click', toggleChartAnimation);
-    }
-
-    const arrivalInput = document.getElementById('mean-arrival');
-    const serviceInput = document.getElementById('service-mean');
-    if (arrivalInput) arrivalInput.addEventListener('input', validateUtilization);
-    if (serviceInput) serviceInput.addEventListener('input', validateUtilization);
-
-    const exportLink = document.querySelector('.export-data-link');
-    if (exportLink) {
-        exportLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            exportSimulationData();
-        });
-    }
-
-    const helpLink = document.getElementById('help-link');
-    if (helpLink) {
-        helpLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            showHelp();
-        });
-    }
 }
 
 // ==================== MODEL SELECTION ====================
 function initializeModelSelection() {
-    selectModel('M/M/1');
-}
-
-function selectModel(model) {
-    document.querySelectorAll('.model-option').forEach(opt => {
-        opt.classList.remove('active');
-    });
-    
-    const selectedOption = document.querySelector(`.model-option[data-model="${model}"]`);
-    if (selectedOption) {
-        selectedOption.classList.add('active');
-        SimulationState.currentModel = model;
-        
-        const displayElement = document.getElementById('selected-model-display');
-        if (displayElement) {
-            displayElement.innerHTML = `
+    document.querySelectorAll('.model-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
+            this.classList.add('active');
+            
+            const model = this.getAttribute('data-model');
+            SimulationState.currentModel = model;
+            
+            document.getElementById('selected-model-display').innerHTML = `
                 <div class="selected-model-header">
                     <i class="fas fa-check-circle me-2"></i>Selected Model:
                 </div>
-                <div class="badge bg-primary">${model}</div>
+                <div class="badge bg-primary fs-5 px-3 py-2">${model}</div>
             `;
+            
+            validateUtilization();
+            showToast(`Model changed to ${model} (Poisson arrivals + Gamma service times)`, 'info', 2500);
+        });
+    });
+}
+
+// ==================== INPUT VALIDATION ====================
+function initializeInputValidation() {
+    ['mean-arrival', 'service-mean-time', 'service-shape-k', 'simulation-time'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', () => {
+                if (input.value < 0) input.value = Math.abs(input.value);
+                validateUtilization();
+            });
         }
-        
-        validateUtilization();
-        showModelInfo(model);
+    });
+}
+
+function validateUtilization() {
+    const arrivalMean = parseFloat(document.getElementById('mean-arrival').value);
+    const serviceMeanTime = parseFloat(document.getElementById('service-mean-time').value);
+    const shapeK = parseFloat(document.getElementById('service-shape-k').value);
+    const model = SimulationState.currentModel;
+    
+    if (!arrivalMean || !serviceMeanTime || !shapeK || !model) return;
+    
+    const c = parseInt(model.split('/')[2]);
+    const lambda = 1 / arrivalMean;  // arrivals per minute
+    const mu = 1 / serviceMeanTime;  // services per minute per server
+    const utilization = lambda / (c * mu);
+    
+    const warningEl = document.getElementById('utilization-warning');
+    const warningText = document.getElementById('warning-text');
+    
+    if (utilization >= 1) {
+        warningEl.className = 'alert alert-danger';
+        warningText.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>System unstable! Utilization ρ = ${utilization.toFixed(2)} ≥ 1. Reduce arrival rate or add servers.`;
+        warningEl.style.display = 'block';
+    } else if (utilization >= 0.85) {
+        warningEl.className = 'alert alert-warning';
+        warningText.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>High utilization (ρ = ${utilization.toFixed(2)}). Expect long queues with variable service times.`;
+        warningEl.style.display = 'block';
+    } else if (utilization >= 0.6) {
+        warningEl.className = 'alert alert-info';
+        warningText.innerHTML = `<i class="fas fa-info-circle me-2"></i>Optimal utilization (ρ = ${utilization.toFixed(2)}). System operating efficiently.`;
+        warningEl.style.display = 'block';
+    } else {
+        warningEl.style.display = 'none';
     }
+    
+    document.getElementById('stat-utilization').textContent = `${Math.min(99, Math.round(utilization * 100))}%`;
+    
+    // Update chart label with current k value
+    document.getElementById('chart-k-value').textContent = shapeK.toFixed(1);
 }
 
-function showModelInfo(model) {
-    const modelInfo = {
-        'M/M/1': 'Single server queue with Poisson arrivals and exponential service times.',
-        'M/M/2': 'Two identical servers with Poisson arrivals and exponential service times.',
-        'M/M/3': 'Three identical servers with Poisson arrivals and exponential service times.',
-        'M/M/4': 'Four identical servers with Poisson arrivals and exponential service times.'
-    };
-    showToast(modelInfo[model], 'info', 3000);
-}
-
-// ==================== SIMULATION FUNCTIONS ====================
+// ==================== SIMULATION CORE ====================
 function runSimulation() {
     if (!validateInputs()) return;
-    showLoading(true);
-
+    
+    document.getElementById('loading-overlay').style.display = 'flex';
+    
     const arrivalMean = parseFloat(document.getElementById('mean-arrival').value);
-    const serviceMean = parseFloat(document.getElementById('service-mean').value);
+    const serviceMeanTime = parseFloat(document.getElementById('service-mean-time').value);
+    const shapeK = parseFloat(document.getElementById('service-shape-k').value);
     const simulationTime = parseInt(document.getElementById('simulation-time').value);
     const model = SimulationState.currentModel;
-
-    if (!model) {
-        showToast('Please select a queueing model', 'error', 3000);
-        showLoading(false);
-        return;
-    }
-
     const c = parseInt(model.split('/')[2]);
+    
     const lambda = 1 / arrivalMean;
-    const mu = 1 / serviceMean;
+    const mu = 1 / serviceMeanTime;
     const utilization = lambda / (c * mu);
-
+    
     if (utilization >= 1) {
-        showToast(`System is unstable: Utilization (ρ = ${utilization.toFixed(2)}) ≥ 1`, 'error', 5000);
-        showLoading(false);
+        showToast('System is unstable! Utilization ≥ 1. Adjust parameters.', 'error', 4000);
+        document.getElementById('loading-overlay').style.display = 'none';
         return;
     }
-
+    
     setTimeout(() => {
         try {
-            let simulationResult, theoreticalParams;
+            let simulationResult;
+            let theoreticalParams;
             
+            // Generate interarrival times (Poisson process = exponential inter-arrivals)
             const interarrivals = generateInterarrivals(arrivalMean, simulationTime);
-            const serviceTimes = interarrivals.map(() => roundTo(exponentialRandom(serviceMean), 2));
             
+            // Generate Gamma-distributed service times
+            const serviceTimes = interarrivals.map(() => roundTo(gammaRandom(shapeK, serviceMeanTime), 2));
+            
+            // Run queue simulation
             simulationResult = simulateQueue(interarrivals, serviceTimes, c);
             
+            // Calculate theoretical values based on M/G/c model
             if (c === 1) {
-                theoreticalParams = calculateMM1Params(lambda, mu);
+                theoreticalParams = calculateMG1Params(lambda, serviceMeanTime, shapeK);
             } else {
-                theoreticalParams = calculateMultiServerParams(lambda, mu, c);
+                theoreticalParams = calculateMGCParams(lambda, serviceMeanTime, c, shapeK);
             }
             
+            // Update UI with results
             updateSimulationTables(simulationResult, c);
             updateCPTable(arrivalMean);
             updateKPIs(theoreticalParams, simulationResult);
             updateStats(simulationResult);
             updateServerStats(simulationResult, c);
             
+            // Store simulation data for charts
             SimulationState.simulationData = {
                 arrival: simulationResult.arrivalTimes,
                 service: simulationResult.serviceTimes,
                 turnAround: simulationResult.turnaroundTimes,
-                queueLength: simulationResult.queueLengths
+                queueLength: simulationResult.queueLengths,
+                shapeK: shapeK
             };
             
-            // Draw charts - will wait if library not loaded
-            generateGraphs(SimulationState.simulationData);
-            
-            showLoading(false);
-            showToast('Simulation completed successfully!', 'success', 3000);
-            
-            document.querySelector('.stats-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Draw charts AFTER Google Charts is loaded
+            waitForCharts(() => {
+                generateGraphs(SimulationState.simulationData);
+                document.getElementById('loading-overlay').style.display = 'none';
+                showToast('M/G/c Simulation completed successfully!', 'success', 3500);
+                
+                document.querySelector('.stats-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
             
         } catch (error) {
             console.error('Simulation error:', error);
-            showToast('Error running simulation: ' + error.message, 'error', 5000);
-            showLoading(false);
+            showToast(`Simulation error: ${error.message}`, 'error', 5000);
+            document.getElementById('loading-overlay').style.display = 'none';
         }
     }, 800);
 }
 
-function showLoading(show) {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.style.display = show ? 'flex' : 'none';
+function waitForCharts(callback, attempts = 0) {
+    if (SimulationState.googleChartsLoaded) {
+        callback();
+    } else if (attempts < 20) {
+        setTimeout(() => waitForCharts(callback, attempts + 1), 100);
+    } else {
+        console.error('Google Charts failed to load');
+        showToast('Chart library failed to load. Results may be incomplete.', 'warning', 4000);
+        callback();
     }
 }
 
-// ==================== INPUT VALIDATION ====================
-function initializeInputValidation() {
-    const inputs = document.querySelectorAll('input[type="number"]');
-    inputs.forEach(input => {
-        input.addEventListener('input', function() {
-            if (this.value < 0) this.value = Math.abs(this.value);
-        });
-    });
-}
-
-function validateInputs() {
-    const model = SimulationState.currentModel;
-    const arrivalMean = document.getElementById('mean-arrival');
-    const serviceMean = document.getElementById('service-mean');
-    const simulationTime = document.getElementById('simulation-time');
-    
-    if (!model || model === 'None Selected') {
-        showToast('Please select a queueing model', 'warning', 3000);
-        return false;
-    }
-
-    if (!simulationTime || !simulationTime.value || simulationTime.value <= 0) {
-        showToast('Please enter a valid simulation time', 'warning', 3000);
-        if (simulationTime) simulationTime.focus();
-        return false;
-    }
-
-    if (!arrivalMean || !arrivalMean.value || arrivalMean.value <= 0) {
-        showToast('Please enter a valid arrival rate', 'warning', 3000);
-        if (arrivalMean) arrivalMean.focus();
-        return false;
-    }
-
-    if (!serviceMean || !serviceMean.value || serviceMean.value <= 0) {
-        showToast('Please enter a valid service rate', 'warning', 3000);
-        if (serviceMean) serviceMean.focus();
-        return false;
-    }
-
-    return true;
-}
-
-function validateUtilization() {
-    const arrivalMeanInput = document.getElementById('mean-arrival');
-    const serviceMeanInput = document.getElementById('service-mean');
-    const model = SimulationState.currentModel;
-    
-    if (!arrivalMeanInput || !serviceMeanInput || !model) return;
-
-    const arrivalMean = parseFloat(arrivalMeanInput.value);
-    const serviceMean = parseFloat(serviceMeanInput.value);
-
-    if (!arrivalMean || !serviceMean) return;
-
-    const c = parseInt(model.split('/')[2]);
-    const lambda = 1 / arrivalMean;
-    const mu = 1 / serviceMean;
-    const utilization = lambda / (c * mu);
-
-    const warningElement = document.getElementById('utilization-warning');
-    const warningText = document.getElementById('warning-text');
-
-    if (warningElement && warningText) {
-        if (utilization >= 0.9) {
-            warningElement.style.display = 'block';
-            warningText.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>High utilization detected (ρ = ${utilization.toFixed(2)}). System may experience long queues.`;
-            warningElement.className = 'alert alert-warning';
-        } else if (utilization >= 0.7) {
-            warningElement.style.display = 'block';
-            warningText.innerHTML = `<i class="fas fa-info-circle me-2"></i>Moderate utilization (ρ = ${utilization.toFixed(2)}). System operating efficiently.`;
-            warningElement.className = 'alert alert-info';
-        } else if (utilization < 0.3) {
-            warningElement.style.display = 'block';
-            warningText.innerHTML = `<i class="fas fa-info-circle me-2"></i>Low utilization (ρ = ${utilization.toFixed(2)}). System may be over-provisioned.`;
-            warningElement.className = 'alert alert-secondary';
-        } else {
-            warningElement.style.display = 'none';
+// ==================== GAMMA RANDOM NUMBER GENERATOR ====================
+// Marsaglia and Tsang method for Gamma distribution (shape k, scale theta)
+function gammaRandom(shape, scale) {
+    // For shape >= 1, use Marsaglia-Tsang method
+    if (shape >= 1) {
+        const d = shape - 1/3;
+        const c = 1 / Math.sqrt(9 * d);
+        
+        while (true) {
+            let x, v;
+            do {
+                x = normalRandom(0, 1);
+                v = 1 + c * x;
+            } while (v <= 0);
+            
+            v = v * v * v;
+            const u = Math.random();
+            
+            if (u < 1 - 0.0331 * x * x * x * x) {
+                return d * v * scale;
+            }
+            
+            if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) {
+                return d * v * scale;
+            }
         }
+    } 
+    // For shape < 1, use transformation method
+    else {
+        const result = gammaRandom(shape + 1, scale);
+        const u = Math.random();
+        return result * Math.pow(u, 1/shape);
     }
+}
 
-    const utilizationElement = document.getElementById('stat-utilization');
-    if (utilizationElement) {
-        utilizationElement.textContent = `${Math.min(99, Math.round(utilization * 100))}%`;
-    }
+// Box-Muller transform for standard normal random variable
+function normalRandom(mean = 0, stdDev = 1) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    
+    const z0 = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    return z0 * stdDev + mean;
 }
 
 // ==================== UTILITY FUNCTIONS ====================
 function factorial(n) {
-    if (n < 0) return null;
-    if (n === 0 || n === 1) return 1;
+    if (n <= 1) return 1;
     let result = 1;
-    for (let i = 2; i <= n; i++) {
-        result *= i;
-    }
+    for (let i = 2; i <= n; i++) result *= i;
     return result;
 }
 
@@ -465,12 +407,60 @@ function simulateQueue(interarrivals, serviceTimes, serverCount) {
     };
 }
 
+// ==================== M/G/c THEORETICAL CALCULATIONS ====================
+// M/G/1: Pollaczek-Khinchin formula
+function calculateMG1Params(lambda, serviceMeanTime, shapeK) {
+    const mu = 1 / serviceMeanTime;
+    const rho = lambda / mu;
+    const Cs_squared = 1 / shapeK; // Squared coefficient of variation for Gamma
+    
+    // Pollaczek-Khinchin formula for Wq
+    const wq = (rho * serviceMeanTime * (1 + Cs_squared)) / (2 * (1 - rho));
+    const lq = lambda * wq;
+    const ws = wq + serviceMeanTime;
+    const ls = lambda * ws;
+    
+    return { rho, lq, wq, ws, ls, Cs_squared };
+}
+
+// M/G/c (c>1): Allen-Cunneen approximation
+function calculateMGCParams(lambda, serviceMeanTime, c, shapeK) {
+    const mu = 1 / serviceMeanTime;
+    const rho = lambda / (c * mu);
+    const Cs_squared = 1 / shapeK;
+    
+    // First calculate M/M/c parameters
+    const mmParams = calculateMMcParams(lambda, mu, c);
+    
+    // Allen-Cunneen approximation for Wq in M/G/c
+    const wq = mmParams.wq * ((1 + Cs_squared) / 2);
+    const lq = lambda * wq;
+    const ws = wq + serviceMeanTime;
+    const ls = lambda * ws;
+    
+    return { rho, lq, wq, ws, ls, Cs_squared };
+}
+
+// Helper: M/M/c calculations (for approximation)
+function calculateMMcParams(lambda, mu, c) {
+    let sum = 0;
+    for (let n = 0; n < c; n++) {
+        sum += Math.pow(lambda / mu, n) / factorial(n);
+    }
+    const rho = lambda / (c * mu);
+    const p0 = 1 / (sum + (Math.pow(lambda / mu, c) / (factorial(c) * (1 - rho))));
+    const lq = (p0 * Math.pow(lambda / mu, c) * rho) / (factorial(c) * Math.pow(1 - rho, 2));
+    const wq = lq / lambda;
+    const ws = wq + (1 / mu);
+    const ls = lambda * ws;
+    
+    return { rho, p0, lq, wq, ws, ls };
+}
+
 // ==================== CHART GENERATION ====================
-// CRITICAL FIX: Charts are now drawn WITHOUT setOnLoadCallback inside each function
 function generateGraphs(data) {
     if (!data) return;
     
-    // If Google Charts hasn't loaded yet, store data and wait
     if (!SimulationState.googleChartsLoaded) {
         console.log('Google Charts not loaded yet, storing data for later...');
         SimulationState.pendingChartData = data;
@@ -478,14 +468,12 @@ function generateGraphs(data) {
         return;
     }
     
-    // Draw all charts
     drawArrivalChart(data.arrival || []);
-    drawServiceTimeChart(data.service || []);
+    drawServiceTimeChart(data.service || [], data.shapeK || 1);
     drawTurnAroundTimeChart(data.turnAround || []);
     drawQueueLengthChart(data.queueLength || []);
 }
 
-// FIXED: Removed google.charts.setOnLoadCallback wrapper
 function drawArrivalChart(arrivalTimes) {
     const container = document.getElementById('linechart');
     if (!container) return;
@@ -500,7 +488,7 @@ function drawArrivalChart(arrivalTimes) {
         });
         
         const options = {
-            title: 'Customer Arrival Pattern',
+            title: 'Poisson Arrival Pattern',
             curveType: 'function',
             legend: { position: 'bottom' },
             height: 400,
@@ -540,8 +528,7 @@ function drawArrivalChart(arrivalTimes) {
     }
 }
 
-// FIXED: Removed google.charts.setOnLoadCallback wrapper
-function drawServiceTimeChart(serviceTimes) {
+function drawServiceTimeChart(serviceTimes, shapeK) {
     const container = document.getElementById('linechart-service');
     if (!container) return;
     
@@ -555,7 +542,7 @@ function drawServiceTimeChart(serviceTimes) {
         });
         
         const options = {
-            title: 'Service Time Distribution',
+            title: `Gamma Service Times (Shape k = ${shapeK.toFixed(1)})`,
             legend: { position: 'bottom' },
             height: 400,
             backgroundColor: 'transparent',
@@ -592,7 +579,6 @@ function drawServiceTimeChart(serviceTimes) {
     }
 }
 
-// FIXED: Removed google.charts.setOnLoadCallback wrapper
 function drawTurnAroundTimeChart(turnAroundTimes) {
     const container = document.getElementById('linechart-turnAround');
     if (!container) return;
@@ -646,7 +632,6 @@ function drawTurnAroundTimeChart(turnAroundTimes) {
     }
 }
 
-// FIXED: Removed google.charts.setOnLoadCallback wrapper and syntax errors
 function drawQueueLengthChart(queueLengths) {
     const container = document.getElementById('queue-length-chart');
     if (!container) return;
@@ -855,6 +840,9 @@ function updateServerStats(simulation, serverCount) {
                             <small class="text-muted">Avg Service</small>
                         </div>
                     </div>
+                    <div class="mt-2 pt-2 border-top">
+                        <small class="text-muted">Gamma service times</small>
+                    </div>
                 </div>
             </div>
         `;
@@ -862,44 +850,42 @@ function updateServerStats(simulation, serverCount) {
     }
 }
 
-// ==================== QUEUE THEORY CALCULATIONS ====================
-function calculateMM1Params(lambda, mu) {
-    const rho = lambda / mu;
-    const lq = (rho ** 2) / (1 - rho);
-    const wq = lq / lambda;
-    const ws = wq + (1 / mu);
-    const ls = lambda * ws;
-    return { rho, lq, wq, ws, ls };
-}
-
-function calculateMultiServerParams(lambda, mu, c) {
-    let sum = 0;
-    for (let n = 0; n < c; n++) {
-        sum += (lambda / mu) ** n / factorial(n);
-    }
-    const rho = lambda / (c * mu);
-    const p0 = 1 / (sum + ((lambda / mu) ** c) / (factorial(c) * (1 - rho)));
-    const lq = (p0 * ((lambda / mu) ** c) * rho) / (factorial(c) * ((1 - rho) ** 2));
-    const wq = lq / lambda;
-    const ws = wq + (1 / mu);
-    const ls = lambda * ws;
-    return { rho, p0, lq, wq, ws, ls };
-}
-
 // ==================== UI HELPERS ====================
+function validateInputs() {
+    const requiredFields = ['simulation-time', 'mean-arrival', 'service-mean-time', 'service-shape-k'];
+    for (const field of requiredFields) {
+        const input = document.getElementById(field);
+        if (!input.value || parseFloat(input.value) <= 0) {
+            showToast(`Please enter a valid value for ${field.replace('-', ' ')}`, 'warning', 3000);
+            input.focus();
+            return false;
+        }
+    }
+    
+    const shapeK = parseFloat(document.getElementById('service-shape-k').value);
+    if (shapeK < 0.1) {
+        showToast('Shape parameter (k) must be ≥ 0.1', 'warning', 3000);
+        document.getElementById('service-shape-k').focus();
+        return false;
+    }
+    
+    return true;
+}
+
 function resetSimulation() {
     if (!confirm('Reset simulation? All current results will be lost.')) return;
     
     document.getElementById('simulation-time').value = '480';
     document.getElementById('mean-arrival').value = '5';
-    document.getElementById('service-mean').value = '6';
+    document.getElementById('service-mean-time').value = '6';
+    document.getElementById('service-shape-k').value = '1';
     
     document.getElementById('simulation_table').innerHTML = `
         <tr>
             <td colspan="10" class="text-center py-5 text-muted">
                 <i class="fas fa-play-circle fa-3x mb-3 opacity-50"></i>
-                <p class="fs-5 fw-bold mb-1">Ready to Simulate</p>
-                <p class="mb-0">Configure parameters and click "Run Simulation" to generate data</p>
+                <p class="fs-5 fw-bold mb-1">Ready for M/G/c Simulation</p>
+                <p class="mb-0">Configure Gamma parameters and click "Run Simulation"</p>
             </td>
         </tr>
     `;
@@ -908,8 +894,8 @@ function resetSimulation() {
         <tr>
             <td colspan="3" class="text-center py-5 text-muted">
                 <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
-                <p class="fs-5 fw-bold mb-1">Cumulative Probability Table</p>
-                <p class="mb-0">Run simulation to generate probability distribution data</p>
+                <p class="fs-5 fw-bold mb-1">Poisson Arrival Distribution</p>
+                <p class="mb-0">Run simulation to generate inter-arrival probability table</p>
             </td>
         </tr>
     `;
@@ -924,7 +910,7 @@ function resetSimulation() {
         <div class="col-12 text-center py-5">
             <i class="fas fa-server fa-3x text-muted mb-3"></i>
             <p class="text-muted fs-5">Run simulation to view server statistics</p>
-            <p class="text-muted">Select a model and click "Run Simulation" to generate performance metrics</p>
+            <p class="text-muted">Select M/G/c model and configure Gamma parameters</p>
         </div>
     `;
     
@@ -937,7 +923,16 @@ function resetSimulation() {
     SimulationState.charts = {};
     SimulationState.pendingChartData = null;
     
-    selectModel('M/M/1');
+    document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
+    document.querySelector('.model-option[data-model="M/G/1"]').classList.add('active');
+    SimulationState.currentModel = 'M/G/1';
+    document.getElementById('selected-model-display').innerHTML = `
+        <div class="selected-model-header">
+            <i class="fas fa-check-circle me-2"></i>Selected Model:
+        </div>
+        <div class="badge bg-primary">M/G/1</div>
+    `;
+    
     validateUtilization();
     
     showToast('Simulation reset successfully', 'info', 2500);
@@ -964,7 +959,7 @@ function showToast(message, type = 'info', duration = 3000) {
             fontSize: '16px',
             fontWeight: '600',
             color: 'white',
-            maxWidth: '400px'
+            maxWidth: '450px'
         },
         stopOnFocus: true
     }).showToast();
@@ -978,44 +973,66 @@ function showHelp() {
 function setDefaultValues() {
     document.getElementById('simulation-time').value = '480';
     document.getElementById('mean-arrival').value = '5';
-    document.getElementById('service-mean').value = '6';
+    document.getElementById('service-mean-time').value = '6';
+    document.getElementById('service-shape-k').value = '1';
     validateUtilization();
 }
 
-// ==================== ADDITIONAL FUNCTIONS ====================
-function toggleChartAnimation() {
-    SimulationState.isAnimating = !SimulationState.isAnimating;
-    const btn = document.getElementById('toggle-animation');
-    if (btn) {
-        btn.innerHTML = SimulationState.isAnimating ?
-            '<i class="fas fa-pause me-1"></i> Pause Animation' :
-            '<i class="fas fa-play me-1"></i> Animate Charts';
-    }
-    if (SimulationState.simulationData) redrawAllCharts();
+// ==================== EVENT LISTENERS ====================
+function initializeEventListeners() {
+    document.getElementById('calculate-btn')?.addEventListener('click', runSimulation);
+    document.getElementById('reset-btn')?.addEventListener('click', resetSimulation);
+    document.getElementById('help-btn')?.addEventListener('click', showHelp);
+    document.getElementById('help-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showHelp();
+    });
+    
+    document.querySelector('.export-data-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (SimulationState.simulationData) {
+            exportSimulationData();
+        } else {
+            showToast('No simulation data to export. Run an M/G/c simulation first.', 'warning', 3000);
+        }
+    });
+    
+    document.getElementById('toggle-animation')?.addEventListener('click', () => {
+        SimulationState.isAnimating = !SimulationState.isAnimating;
+        document.getElementById('toggle-animation').innerHTML = `
+            <i class="fas ${SimulationState.isAnimating ? 'fa-pause' : 'fa-play'} me-1"></i> 
+            ${SimulationState.isAnimating ? 'Pause Animation' : 'Animate Charts'}
+        `;
+        if (SimulationState.simulationData) redrawAllCharts();
+    });
+    
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            runSimulation();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+            e.preventDefault();
+            resetSimulation();
+        }
+    });
 }
 
-function redrawAllCharts() {
-    if (SimulationState.simulationData && SimulationState.googleChartsLoaded) {
-        generateGraphs(SimulationState.simulationData);
-    }
-}
-
-function exportCharts() {
-    showToast('Chart export feature coming soon!', 'info', 3000);
-}
-
+// ==================== EXPORT FUNCTIONALITY ====================
 function exportSimulationData() {
     if (!SimulationState.simulationData) {
-        showToast('No simulation data to export. Run a simulation first.', 'warning', 3000);
+        showToast('No simulation data available', 'warning', 3000);
         return;
     }
     
+    const shapeK = document.getElementById('service-shape-k').value;
     const data = {
         model: SimulationState.currentModel,
         parameters: {
             simulationTime: document.getElementById('simulation-time').value,
             arrivalMean: document.getElementById('mean-arrival').value,
-            serviceMean: document.getElementById('service-mean').value
+            serviceMeanTime: document.getElementById('service-mean-time').value,
+            shapeK: shapeK
         },
         timestamp: new Date().toISOString(),
         stats: {
@@ -1023,6 +1040,12 @@ function exportSimulationData() {
             utilization: document.getElementById('stat-utilization').textContent,
             avgWait: document.getElementById('stat-wait').textContent,
             avgTurnaround: document.getElementById('stat-turnaround').textContent
+        },
+        theoretical: {
+            lq: document.getElementById('kpi-lq').textContent,
+            wq: document.getElementById('kpi-wq').textContent,
+            ws: document.getElementById('kpi-ws').textContent,
+            ls: document.getElementById('kpi-ls').textContent
         }
     };
     
@@ -1030,32 +1053,20 @@ function exportSimulationData() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `carrefour_simulation_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    a.download = `carrefour_mgc_simulation_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showToast('Simulation data exported successfully!', 'success', 3000);
+    showToast('M/G/c simulation data exported successfully!', 'success', 3000);
 }
 
-// ==================== EVENT LISTENERS & INIT ====================
-document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        runSimulation();
+// ==================== UTILITY ====================
+function redrawAllCharts() {
+    if (SimulationState.simulationData && SimulationState.googleChartsLoaded) {
+        generateGraphs(SimulationState.simulationData);
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-        e.preventDefault();
-        resetSimulation();
-    }
-});
-
-function initTooltips() {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
 }
 
 // Handle chart tab switching
@@ -1070,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         drawArrivalChart(SimulationState.simulationData.arrival);
                         break;
                     case '#service-chart':
-                        drawServiceTimeChart(SimulationState.simulationData.service);
+                        drawServiceTimeChart(SimulationState.simulationData.service, SimulationState.simulationData.shapeK);
                         break;
                     case '#turnaround-chart':
                         drawTurnAroundTimeChart(SimulationState.simulationData.turnAround);

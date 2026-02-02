@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carrefour Queue Simulation Dashboard</title>
+    <title>Carrefour M/G/c Queue Simulator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -15,8 +15,8 @@
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Running Simulation...</div>
-            <div class="loading-subtext">Processing queue dynamics and generating analytics</div>
+            <div class="loading-text">Running M/G/c Simulation...</div>
+            <div class="loading-subtext">Modeling Poisson arrivals with Gamma-distributed service times</div>
         </div>
     </div>
 
@@ -25,7 +25,7 @@
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <i class="fas fa-shopping-cart brand-icon"></i>
-                <span class="brand-text">Carrefour</span> Queue Simulator
+                <span class="brand-text">Carrefour</span> M/G/c Simulator
             </a>
             <div class="navbar-controls">
                 <div class="theme-toggle-container">
@@ -48,31 +48,31 @@
             <div class="col-lg-4 col-xl-3">
                 <div class="card config-card shadow-sm">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Simulation Configuration</h5>
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>M/G/c Configuration</h5>
                     </div>
                     <div class="card-body">
                         <!-- Model Selection -->
                         <div class="model-selection">
                             <h6 class="section-title mb-3"><i class="fas fa-server me-2"></i>Queueing Model</h6>
                             <div class="model-options">
-                                <div class="model-option active" data-model="M/M/1">
+                                <div class="model-option active" data-model="M/G/1">
                                     <div class="model-icon"><i class="fas fa-server"></i></div>
-                                    <span>M/M/1</span>
+                                    <span>M/G/1</span>
                                     <small>Single Server</small>
                                 </div>
-                                <div class="model-option" data-model="M/M/2">
+                                <div class="model-option" data-model="M/G/2">
                                     <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
-                                    <span>M/M/2</span>
+                                    <span>M/G/2</span>
                                     <small>Two Servers</small>
                                 </div>
-                                <div class="model-option" data-model="M/M/3">
+                                <div class="model-option" data-model="M/G/3">
                                     <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
-                                    <span>M/M/3</span>
+                                    <span>M/G/3</span>
                                     <small>Three Servers</small>
                                 </div>
-                                <div class="model-option" data-model="M/M/4">
+                                <div class="model-option" data-model="M/G/4">
                                     <div class="model-icon"><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i><i class="fas fa-server"></i></div>
-                                    <span>M/M/4</span>
+                                    <span>M/G/4</span>
                                     <small>Four Servers</small>
                                 </div>
                             </div>
@@ -80,7 +80,13 @@
                                 <div class="selected-model-header">
                                     <i class="fas fa-check-circle me-2"></i>Selected Model:
                                 </div>
-                                <div class="badge bg-primary">M/M/1</div>
+                                <div class="badge bg-primary">M/G/1</div>
+                            </div>
+                            <div class="mt-3 p-2 bg-info bg-opacity-10 rounded">
+                                <small class="text-info">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>M/G/c Model:</strong> Poisson arrivals + General (Gamma) service times
+                                </small>
                             </div>
                         </div>
 
@@ -99,23 +105,37 @@
                             </div>
                             <div class="parameter-group">
                                 <label class="parameter-label" for="mean-arrival">
-                                    <i class="fas fa-user-plus me-2"></i>Mean Arrival Time (λ)
+                                    <i class="fas fa-user-plus me-2"></i>Mean Inter-Arrival Time
                                 </label>
                                 <div class="input-group">
                                     <input type="number" class="form-control form-control-lg" id="mean-arrival" value="5" step="0.1" min="0.1">
                                     <span class="input-group-text">minutes/customer</span>
                                 </div>
-                                <small class="parameter-hint">Average time between customer arrivals</small>
+                                <small class="parameter-hint">Average time between customer arrivals (Poisson process)</small>
                             </div>
                             <div class="parameter-group">
-                                <label class="parameter-label" for="service-mean">
-                                    <i class="fas fa-hourglass-half me-2"></i>Mean Service Time (μ)
+                                <label class="parameter-label" for="service-mean-time">
+                                    <i class="fas fa-hourglass-half me-2"></i>Mean Service Time
                                 </label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control form-control-lg" id="service-mean" value="6" step="0.1" min="0.1">
+                                    <input type="number" class="form-control form-control-lg" id="service-mean-time" value="6" step="0.1" min="0.1">
                                     <span class="input-group-text">minutes/customer</span>
                                 </div>
                                 <small class="parameter-hint">Average time to serve one customer per server</small>
+                            </div>
+                            <div class="parameter-group">
+                                <label class="parameter-label" for="service-shape-k">
+                                    <i class="fas fa-shapes me-2"></i>Shape Parameter (k)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control form-control-lg" id="service-shape-k" value="1" step="0.1" min="0.1">
+                                </div>
+                                <small class="parameter-hint">
+                                    Gamma distribution shape parameter:<br>
+                                    • k=1: Exponential (high variance)<br>
+                                    • k>1: Lower variance (more predictable)<br>
+                                    • k→∞: Near-constant service times
+                                </small>
                             </div>
                         </div>
 
@@ -128,11 +148,20 @@
                         <!-- Action Buttons -->
                         <div class="d-grid gap-2 mt-4">
                             <button class="btn btn-primary btn-lg" id="calculate-btn">
-                                <i class="fas fa-play-circle me-2"></i>Run Simulation
+                                <i class="fas fa-play-circle me-2"></i>Run M/G/c Simulation
                             </button>
                             <button class="btn btn-outline-secondary" id="reset-btn">
                                 <i class="fas fa-undo-alt me-2"></i>Reset Simulation
                             </button>
+                        </div>
+                        
+                        <div class="mt-4 p-3 bg-light rounded">
+                            <h6 class="mb-2"><i class="fas fa-book me-1 text-primary"></i>Key Formulas</h6>
+                            <small>
+                                <strong>M/G/1:</strong> Pollaczek-Khinchin formula<br>
+                                <strong>M/G/c (c>1):</strong> Allen-Cunneen approximation<br>
+                                <strong>Coeff. of Variation:</strong> C<sub>s</sub>² = 1/k
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -211,7 +240,7 @@
                 <!-- Charts Section -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Simulation Analytics</h5>
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>M/G/c Simulation Analytics</h5>
                         <div class="chart-controls">
                             <button class="btn btn-outline-primary btn-sm me-2" id="export-charts">
                                 <i class="fas fa-download me-1"></i> Export PNG
@@ -230,7 +259,7 @@
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service-chart" type="button" role="tab">
-                                    <i class="fas fa-stopwatch me-1"></i> Service Times
+                                    <i class="fas fa-stopwatch me-1"></i> Service Times (Gamma)
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
@@ -248,13 +277,13 @@
                             <div class="tab-pane fade show active" id="arrival-chart" role="tabpanel">
                                 <div class="chart-wrapper">
                                     <div id="linechart" class="chart-container" style="height: 400px; width: 100%;"></div>
-                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Customer arrival pattern over simulation time</div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Poisson arrival pattern over simulation time</div>
                                 </div>
                             </div>
                             <div class="tab-pane fade" id="service-chart" role="tabpanel">
                                 <div class="chart-wrapper">
                                     <div id="linechart-service" class="chart-container" style="height: 400px; width: 100%;"></div>
-                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Service time distribution per customer</div>
+                                    <div class="chart-title"><i class="fas fa-info-circle me-1"></i> Gamma-distributed service times (Shape k = <span id="chart-k-value">1</span>)</div>
                                 </div>
                             </div>
                             <div class="tab-pane fade" id="turnaround-chart" role="tabpanel">
@@ -276,14 +305,14 @@
                 <!-- Server Statistics -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-server me-2"></i>Server Performance</h5>
+                        <h5 class="mb-0"><i class="fas fa-server me-2"></i>Server Performance (Gamma Service Times)</h5>
                     </div>
                     <div class="card-body">
                         <div class="row" id="server-stats-container">
                             <div class="col-12 text-center py-5">
                                 <i class="fas fa-server fa-3x text-muted mb-3"></i>
                                 <p class="text-muted fs-5">Run simulation to view server statistics</p>
-                                <p class="text-muted">Select a model and click "Run Simulation" to generate performance metrics</p>
+                                <p class="text-muted">Select M/G/c model and configure Gamma parameters</p>
                             </div>
                         </div>
                     </div>
@@ -292,7 +321,7 @@
                 <!-- Results Tables -->
                 <div class="card shadow-sm">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>Simulation Results</h5>
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i>M/G/c Simulation Results</h5>
                         <ul class="nav nav-pills card-header-pills">
                             <li class="nav-item">
                                 <a class="nav-link active" id="simulation-tab" data-bs-toggle="tab" href="#simulation-table" role="tab">Simulation Data</a>
@@ -325,8 +354,8 @@
                                             <tr>
                                                 <td colspan="10" class="text-center py-5 text-muted">
                                                     <i class="fas fa-play-circle fa-3x mb-3 opacity-50"></i>
-                                                    <p class="fs-5 fw-bold mb-1">Ready to Simulate</p>
-                                                    <p class="mb-0">Configure parameters and click "Run Simulation" to generate data</p>
+                                                    <p class="fs-5 fw-bold mb-1">Ready for M/G/c Simulation</p>
+                                                    <p class="mb-0">Configure Gamma parameters and click "Run Simulation"</p>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -347,8 +376,8 @@
                                             <tr>
                                                 <td colspan="3" class="text-center py-5 text-muted">
                                                     <i class="fas fa-chart-line fa-3x mb-3 opacity-50"></i>
-                                                    <p class="fs-5 fw-bold mb-1">Cumulative Probability Table</p>
-                                                    <p class="mb-0">Run simulation to generate probability distribution data</p>
+                                                    <p class="fs-5 fw-bold mb-1">Poisson Arrival Distribution</p>
+                                                    <p class="mb-0">Run simulation to generate inter-arrival probability table</p>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -367,14 +396,14 @@
         <div class="container-fluid">
             <div class="row align-items-center">
                 <div class="col-md-8 text-center text-md-start mb-3 mb-md-0">
-                    <p class="mb-0">&copy; 2026 Carrefour Queueing Simulation Dashboard v3.0</p>
-                    <p class="mb-0 text-muted small">Academic simulation tool for queueing theory analysis</p>
+                    <p class="mb-0">&copy; 2026 Carrefour M/G/c Queueing Simulator v1.0</p>
+                    <p class="mb-0 text-muted small">Poisson arrivals with Gamma-distributed service times | Academic simulation tool</p>
                 </div>
                 <div class="col-md-4 text-center text-md-end">
                     <div class="footer-links d-flex flex-wrap justify-content-center justify-content-md-end gap-3">
-                        <a href="#" class="footer-link" id="help-link"><i class="fas fa-book me-1"></i> User Guide</a>
+                        <a href="#" class="footer-link" id="help-link"><i class="fas fa-book me-1"></i> M/G/c Guide</a>
                         <a href="#" class="footer-link export-data-link"><i class="fas fa-file-export me-1"></i> Export Data</a>
-                        <a href="#" class="footer-link"><i class="fas fa-calculator me-1"></i> Theoretical Calculator</a>
+                        <a href="#" class="footer-link"><i class="fas fa-calculator me-1"></i> Theoretical Formulas</a>
                     </div>
                 </div>
             </div>
@@ -386,25 +415,32 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="helpModalLabel"><i class="fas fa-question-circle me-2 text-primary"></i>Simulation Guide</h5>
+                    <h5 class="modal-title" id="helpModalLabel"><i class="fas fa-question-circle me-2 text-primary"></i>M/G/c Simulation Guide</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-4">
-                        <h6 class="mb-3"><i class="fas fa-bolt text-warning me-2"></i>Quick Start</h6>
-                        <ol>
-                            <li>Select a queueing model (M/M/1 to M/M/4)</li>
-                            <li>Set simulation duration (minutes)</li>
-                            <li>Enter mean arrival time (minutes/customer)</li>
-                            <li>Enter mean service time (minutes/customer)</li>
-                            <li>Click "Run Simulation" to generate results</li>
-                        </ol>
+                        <h6 class="mb-3"><i class="fas fa-bolt text-warning me-2"></i>Key Concepts</h6>
+                        <ul>
+                            <li><strong>Arrivals:</strong> Poisson process (exponential inter-arrival times)</li>
+                            <li><strong>Service Times:</strong> Gamma distribution with shape parameter <em>k</em></li>
+                            <li><strong>Shape Parameter (k):</strong> Controls service time variability
+                                <ul>
+                                    <li>k=1: Exponential distribution (high variance, M/M/c)</li>
+                                    <li>k>1: Lower variance (more predictable service)</li>
+                                    <li>k→∞: Near-constant service times (D)</li>
+                                </ul>
+                            </li>
+                        </ul>
                     </div>
                     
                     <div class="mb-4 p-3 bg-light rounded">
-                        <h6 class="mb-2"><i class="fas fa-lightbulb text-success me-2"></i>Key Insight</h6>
-                        <p class="mb-0"><strong>Utilization (ρ) = λ/(cμ)</strong> must be &lt; 1 for stable system</p>
-                        <p class="mb-0 mt-1">Where λ = arrival rate, μ = service rate, c = number of servers</p>
+                        <h6 class="mb-2"><i class="fas fa-lightbulb text-success me-2"></i>Theoretical Formulas</h6>
+                        <p><strong>M/G/1 (Single Server):</strong></p>
+                        <p class="mb-1">W<sub>q</sub> = [ρ × (1/μ) × (1 + C<sub>s</sub>²)] / [2 × (1 - ρ)]</p>
+                        <p class="mb-1">Where C<sub>s</sub>² = 1/k (squared coefficient of variation)</p>
+                        <p><strong>M/G/c (Multi-Server):</strong></p>
+                        <p class="mb-0">W<sub>q</sub><sup>M/G/c</sup> ≈ W<sub>q</sub><sup>M/M/c</sup> × (1 + C<sub>s</sub>²)/2</p>
                     </div>
                     
                     <div class="mb-4">
@@ -414,11 +450,12 @@
                             <li><strong>Wq:</strong> Average waiting time before service begins</li>
                             <li><strong>W:</strong> Total time in system (waiting + service)</li>
                             <li><strong>L:</strong> Average number of customers in entire system</li>
+                            <li><strong>ρ:</strong> System utilization (must be &lt; 1 for stability)</li>
                         </ul>
                     </div>
                     
                     <div class="alert alert-info mb-0">
-                        <i class="fas fa-info-circle me-2"></i>For accurate results, run simulations for at least 480 minutes (8 hours)
+                        <i class="fas fa-info-circle me-2"></i>For accurate results, run simulations for at least 480 minutes (8 hours). Lower shape parameter (k) increases service time variability and queue lengths.
                     </div>
                 </div>
                 <div class="modal-footer">
